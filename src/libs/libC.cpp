@@ -810,6 +810,82 @@ static KYTY_SYSV_ABI int libc_wmemcmp(const char16_t* a, const char16_t* b, size
 	return 0;
 }
 
+static KYTY_SYSV_ABI char16_t* libc_wcscpy(char16_t* dest, const char16_t* src) {
+	if (dest == nullptr || src == nullptr) {
+		return dest;
+	}
+	char16_t* d = dest;
+	while ((*d++ = *src++) != 0) {
+	}
+	return dest;
+}
+
+static KYTY_SYSV_ABI int libc_wcscmp(const char16_t* a, const char16_t* b) {
+	if (a == nullptr || b == nullptr) {
+		return (a == b) ? 0 : (a == nullptr ? -1 : 1);
+	}
+	while (*a != 0 && *a == *b) {
+		++a;
+		++b;
+	}
+	if (*a == *b) {
+		return 0;
+	}
+	return (*a < *b) ? -1 : 1;
+}
+
+// MSVC STL internal: find first element in [first,last) equal to value, where
+// element size matches the suffix (1/2/4/8 bytes). Returns `last` if no hit.
+static KYTY_SYSV_ABI const void* std_find_trivial_1(const void* first, const void* last, uint8_t v) {
+	auto* p   = static_cast<const uint8_t*>(first);
+	auto* end = static_cast<const uint8_t*>(last);
+	for (; p < end; ++p) {
+		if (*p == v) {
+			return p;
+		}
+	}
+	return end;
+}
+static KYTY_SYSV_ABI const void* std_find_trivial_2(const void* first, const void* last, uint16_t v) {
+	auto* p   = static_cast<const uint16_t*>(first);
+	auto* end = static_cast<const uint16_t*>(last);
+	for (; p < end; ++p) {
+		if (*p == v) {
+			return p;
+		}
+	}
+	return end;
+}
+static KYTY_SYSV_ABI const void* std_find_trivial_4(const void* first, const void* last, uint32_t v) {
+	auto* p   = static_cast<const uint32_t*>(first);
+	auto* end = static_cast<const uint32_t*>(last);
+	for (; p < end; ++p) {
+		if (*p == v) {
+			return p;
+		}
+	}
+	return end;
+}
+static KYTY_SYSV_ABI const void* std_find_trivial_8(const void* first, const void* last, uint64_t v) {
+	auto* p   = static_cast<const uint64_t*>(first);
+	auto* end = static_cast<const uint64_t*>(last);
+	for (; p < end; ++p) {
+		if (*p == v) {
+			return p;
+		}
+	}
+	return end;
+}
+
+// Lazy setjmp/longjmp: PS5 ships setjmp inline-asm thunks that we cannot
+// faithfully re-create without owning the guest's register save area. Return
+// 0 on every call so the "first time through" path runs; the game's early
+// boot has yet to invoke longjmp, so leaving that half unwired is safe for
+// now. Revisit when a matching longjmp NID appears in the log.
+static KYTY_SYSV_ABI int libc_setjmp(void* /*env*/) {
+	return 0;
+}
+
 static KYTY_SYSV_ABI const char16_t* libc_wcschr(const char16_t* s, char16_t c) {
 	if (s == nullptr) {
 		return nullptr;
@@ -1221,6 +1297,13 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("7SXNu+0KBYQ", LibC::libc_wcstof);
 	LIB_FUNC("Ezzq78ZgHPs", LibC::libc_wcschr);
 	LIB_FUNC("fnUEjBCNRVU", LibC::libc_wmemchr);
+	LIB_FUNC("FM5NPnLqBc8", LibC::libc_wcscpy);
+	LIB_FUNC("pNtJdE3x49E", LibC::libc_wcscmp);
+	LIB_FUNC("aRtxlukU9WQ", LibC::std_find_trivial_1);
+	LIB_FUNC("Oa7AB0wiixE", LibC::std_find_trivial_2);
+	LIB_FUNC("Zf7ewes1VtY", LibC::std_find_trivial_4);
+	LIB_FUNC("3sssb+7Wn9M", LibC::std_find_trivial_8);
+	LIB_FUNC("gNQ1V2vfXDE", LibC::libc_setjmp);
 }
 
 } // namespace LibC
