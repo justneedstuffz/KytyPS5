@@ -810,6 +810,31 @@ static KYTY_SYSV_ABI int libc_wmemcmp(const char16_t* a, const char16_t* b, size
 	return 0;
 }
 
+static KYTY_SYSV_ABI const char16_t* libc_wcschr(const char16_t* s, char16_t c) {
+	if (s == nullptr) {
+		return nullptr;
+	}
+	while (*s != 0) {
+		if (*s == c) {
+			return s;
+		}
+		++s;
+	}
+	return (c == 0) ? s : nullptr;
+}
+
+static KYTY_SYSV_ABI const char16_t* libc_wmemchr(const char16_t* s, char16_t c, size_t n) {
+	if (s == nullptr || n == 0) {
+		return nullptr;
+	}
+	for (size_t i = 0; i < n; ++i) {
+		if (s[i] == c) {
+			return s + i;
+		}
+	}
+	return nullptr;
+}
+
 static KYTY_SYSV_ABI char16_t* libc_wmemset(char16_t* dest, char16_t c, size_t n) {
 	if (dest == nullptr) {
 		return dest;
@@ -1194,6 +1219,8 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("Al8MZJh-4hM", LibC::libc_wmemset);
 	LIB_FUNC("d3dMyWORw8A", LibC::libc_wcstol);
 	LIB_FUNC("7SXNu+0KBYQ", LibC::libc_wcstof);
+	LIB_FUNC("Ezzq78ZgHPs", LibC::libc_wcschr);
+	LIB_FUNC("fnUEjBCNRVU", LibC::libc_wmemchr);
 }
 
 } // namespace LibC
