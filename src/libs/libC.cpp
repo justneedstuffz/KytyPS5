@@ -895,6 +895,9 @@ static KYTY_SYSV_ABI float libc_tanf(float x) {
 static KYTY_SYSV_ABI float libc_log2f(float x) {
 	return ::log2f(x);
 }
+static KYTY_SYSV_ABI float libc_powf(float x, float y) {
+	return ::powf(x, y);
+}
 
 // Microsoft-style bounds-checked strncpy_s. Matches the Annex K signature
 // used by Sony's libc: writes up to `count` bytes (plus NUL) into `dest`,
@@ -1340,6 +1343,7 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("8zsu04XNsZ4", LibC::libc_expf);
 	LIB_FUNC("ZE6RNL+eLbk", LibC::libc_tanf);
 	LIB_FUNC("hsi9drzHR2k", LibC::libc_log2f);
+	LIB_FUNC("1D0H2KNjshE", LibC::libc_powf);
 	LIB_FUNC("YNzNkJzYqEg", LibC::libc_strncpy_s);
 }
 
