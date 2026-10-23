@@ -596,6 +596,87 @@ static KYTY_SYSV_ABI void cxa_guard_abort(uint64_t* guard) {
 	g_cxa_guard_cv.notify_all();
 }
 
+static KYTY_SYSV_ABI int bcmp(const void* a, const void* b, size_t n) {
+	PRINT_NAME();
+	return ::memcmp(a, b, n);
+}
+
+static KYTY_SYSV_ABI int rand() {
+	// No PRINT_NAME: this is called in tight loops.
+	return ::rand();
+}
+
+static KYTY_SYSV_ABI size_t libc_strspn(const char* s, const char* accept) {
+	if (s == nullptr || accept == nullptr) {
+		return 0;
+	}
+	return ::strspn(s, accept);
+}
+
+static KYTY_SYSV_ABI size_t libc_strcspn(const char* s, const char* reject) {
+	if (s == nullptr || reject == nullptr) {
+		return 0;
+	}
+	return ::strcspn(s, reject);
+}
+
+static KYTY_SYSV_ABI int strcasecmp(const char* a, const char* b) {
+	if (a == nullptr || b == nullptr) {
+		return (a == b) ? 0 : (a == nullptr ? -1 : 1);
+	}
+	while (*a != 0 && *b != 0) {
+		int ca = std::tolower(static_cast<unsigned char>(*a));
+		int cb = std::tolower(static_cast<unsigned char>(*b));
+		if (ca != cb) {
+			return ca - cb;
+		}
+		++a;
+		++b;
+	}
+	return std::tolower(static_cast<unsigned char>(*a)) -
+	       std::tolower(static_cast<unsigned char>(*b));
+}
+
+static KYTY_SYSV_ABI int fputs(const char* s, FILE* stream) {
+	PRINT_NAME();
+	if (s == nullptr) {
+		return -1;
+	}
+	if (stream == stdout || stream == stderr || stream == nullptr) {
+		LOGF_COLOR(Log::Color::BrightMagenta, "%s", s);
+		return 0;
+	}
+	return ::fputs(s, stream);
+}
+
+// BSD-style thread-safe localtime: (const time_t* timer, struct tm* result).
+// Sony's libc follows BSD; returns 0 on success.
+static KYTY_SYSV_ABI int localtime_s(const int64_t* timer, GuestTm* result) {
+	PRINT_NAME();
+	if (timer == nullptr || result == nullptr) {
+		return -1;
+	}
+	std::tm    host_result {};
+	const auto t = static_cast<std::time_t>(*timer);
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+	if (_localtime64_s(&host_result, &t) != 0) {
+		return -1;
+	}
+#else
+	if (localtime_r(&t, &host_result) == nullptr) {
+		return -1;
+	}
+#endif
+	*result = ToGuestTm(host_result);
+	return 0;
+}
+
+// Itanium ABI sized operator delete: _ZdlPvm (operator delete(void*, size_t)).
+static KYTY_SYSV_ABI void sized_operator_delete(void* ptr, size_t /*size*/) {
+	// Size is informational; the allocator tracks real block size.
+	::free(ptr);
+}
+
 } // namespace LibC
 
 namespace LibcInternalExt {
@@ -882,6 +963,14 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("3GPpjQdAMTw", LibC::cxa_guard_acquire);
 	LIB_FUNC("9rAeANT2tyE", LibC::cxa_guard_release);
 	LIB_FUNC("2emaaluWzUw", LibC::cxa_guard_abort);
+	LIB_FUNC("5TjaJwkLWxE", LibC::bcmp);
+	LIB_FUNC("cpCOXWMgha0", LibC::rand);
+	LIB_FUNC("-kU6bB4M-+k", LibC::libc_strspn);
+	LIB_FUNC("q0F6yS-rCms", LibC::libc_strcspn);
+	LIB_FUNC("AV6ipCNa4Rw", LibC::strcasecmp);
+	LIB_FUNC("QrZZdJ8XsX0", LibC::fputs);
+	LIB_FUNC("fiiNDnNBKVY", LibC::localtime_s);
+	LIB_FUNC("lYDzBVE5mZs", LibC::sized_operator_delete);
 }
 
 } // namespace LibC
