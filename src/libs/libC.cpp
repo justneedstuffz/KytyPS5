@@ -671,6 +671,31 @@ static KYTY_SYSV_ABI int localtime_s(const int64_t* timer, GuestTm* result) {
 	return 0;
 }
 
+static KYTY_SYSV_ABI int strncasecmp(const char* a, const char* b, size_t n) {
+	if (a == nullptr || b == nullptr || n == 0) {
+		return 0;
+	}
+	for (size_t i = 0; i < n; ++i) {
+		int ca = std::tolower(static_cast<unsigned char>(a[i]));
+		int cb = std::tolower(static_cast<unsigned char>(b[i]));
+		if (ca != cb || ca == 0) {
+			return ca - cb;
+		}
+	}
+	return 0;
+}
+
+static KYTY_SYSV_ABI char* libc_strcpy(char* dest, const char* src) {
+	if (dest == nullptr || src == nullptr) {
+		return dest;
+	}
+	return ::strcpy(dest, src);
+}
+
+static KYTY_SYSV_ABI float libc_logf(float x) {
+	return ::logf(x);
+}
+
 // Itanium ABI sized operator delete: _ZdlPvm (operator delete(void*, size_t)).
 // The game owns its allocator (see MallocReplace in libKernel.cpp); any ptr
 // here was handed back by that guest allocator, not host ::malloc, so freeing
@@ -974,6 +999,9 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("QrZZdJ8XsX0", LibC::fputs);
 	LIB_FUNC("fiiNDnNBKVY", LibC::localtime_s);
 	LIB_FUNC("lYDzBVE5mZs", LibC::sized_operator_delete);
+	LIB_FUNC("pXvbDfchu6k", LibC::strncasecmp);
+	LIB_FUNC("kiZSXIWd9vg", LibC::libc_strcpy);
+	LIB_FUNC("RQXLbdT2lc4", LibC::libc_logf);
 }
 
 } // namespace LibC
