@@ -545,6 +545,53 @@ void KYTY_SYSV_ABI cxa_finalize(void* d) {
 	}
 }
 
+static KYTY_SYSV_ABI int vsnprintf(char* s, size_t n, const char* format, VaList* va_list) {
+	PRINT_NAME();
+
+	return GetGuestVsnprintfFunc()(s, n, format, va_list);
+}
+
+// Itanium C++ ABI __cxa_guard: guard object is 64 bits.
+// Byte 0 = initialized flag; byte 1 = in-progress flag.
+static std::mutex              g_cxa_guard_mutex;
+static std::condition_variable g_cxa_guard_cv;
+
+static KYTY_SYSV_ABI int cxa_guard_acquire(uint64_t* guard) {
+	PRINT_NAME();
+
+	auto* bytes = reinterpret_cast<uint8_t*>(guard);
+	std::unique_lock lock(g_cxa_guard_mutex);
+	g_cxa_guard_cv.wait(lock, [bytes] { return bytes[0] != 0 || bytes[1] == 0; });
+	if (bytes[0] != 0) {
+		return 0;
+	}
+	bytes[1] = 1;
+	return 1;
+}
+
+static KYTY_SYSV_ABI void cxa_guard_release(uint64_t* guard) {
+	PRINT_NAME();
+
+	auto* bytes = reinterpret_cast<uint8_t*>(guard);
+	{
+		std::lock_guard lock(g_cxa_guard_mutex);
+		bytes[0] = 1;
+		bytes[1] = 0;
+	}
+	g_cxa_guard_cv.notify_all();
+}
+
+static KYTY_SYSV_ABI void cxa_guard_abort(uint64_t* guard) {
+	PRINT_NAME();
+
+	auto* bytes = reinterpret_cast<uint8_t*>(guard);
+	{
+		std::lock_guard lock(g_cxa_guard_mutex);
+		bytes[1] = 0;
+	}
+	g_cxa_guard_cv.notify_all();
+}
+
 } // namespace LibC
 
 namespace LibcInternalExt {
@@ -827,6 +874,10 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("tsvEmnenz48", LibC::cxa_atexit);
 	LIB_FUNC("H2e8t5ScQGc", LibC::cxa_finalize);
 	LIB_FUNC("DiGVep5yB5w", LibC::std_execute_once);
+	LIB_FUNC("Q2V+iqvjgC0", LibC::vsnprintf);
+	LIB_FUNC("3GPpjQdAMTw", LibC::cxa_guard_acquire);
+	LIB_FUNC("9rAeANT2tyE", LibC::cxa_guard_release);
+	LIB_FUNC("2emaaluWzUw", LibC::cxa_guard_abort);
 }
 
 } // namespace LibC
