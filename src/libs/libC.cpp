@@ -672,9 +672,12 @@ static KYTY_SYSV_ABI int localtime_s(const int64_t* timer, GuestTm* result) {
 }
 
 // Itanium ABI sized operator delete: _ZdlPvm (operator delete(void*, size_t)).
-static KYTY_SYSV_ABI void sized_operator_delete(void* ptr, size_t /*size*/) {
-	// Size is informational; the allocator tracks real block size.
-	::free(ptr);
+// The game owns its allocator (see MallocReplace in libKernel.cpp); any ptr
+// here was handed back by that guest allocator, not host ::malloc, so freeing
+// it with the host CRT corrupts the host heap. Treat as a leak until the
+// game's own _ZdlPv (NID z+P+xCnWLBk) is routed back here.
+static KYTY_SYSV_ABI void sized_operator_delete(void* /*ptr*/, size_t /*size*/) {
+	PRINT_NAME();
 }
 
 } // namespace LibC
