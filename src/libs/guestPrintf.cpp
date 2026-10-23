@@ -703,14 +703,18 @@ static int kyty_printf_internal(bool sn, char* sn_s, size_t sn_n, const char* fo
 			case 's': {
 				const size_t limit = (flags & FLAGS_PRECISION) != 0u ? precision : maxlen;
 				const char* p = VaArg_ptr<const char>(va_list);
-				if (p == nullptr) {
-					// glibc-compatible: a null %s argument prints the literal "(null)".
+				// glibc-compatible: a null or clearly-unmapped %s argument prints "(null)".
+				// Low addresses are reserved on Win/Linux x86-64 and cannot be valid strings.
+				if (reinterpret_cast<uintptr_t>(p) < 0x10000) {
 					p = "(null)";
 				}
 				std::string converted;
 				if ((flags & FLAGS_LONG) != 0u) {
 					// The guest ABI uses a 16-bit code unit for wchar_t.
 					const auto* wide = reinterpret_cast<const char16_t*>(p);
+					if (reinterpret_cast<uintptr_t>(wide) < 0x10000) {
+						wide = u"(null)";
+					}
 					std::u16string_view text(wide, _strnlen_s(wide, limit));
 					if (text.size() == limit && !text.empty() &&
 					    text.back() >= 0xd800 && text.back() <= 0xdbff) {
