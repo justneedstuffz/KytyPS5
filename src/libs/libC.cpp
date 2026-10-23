@@ -696,6 +696,55 @@ static KYTY_SYSV_ABI float libc_logf(float x) {
 	return ::logf(x);
 }
 
+static KYTY_SYSV_ABI double libc_atof(const char* s) {
+	if (s == nullptr) {
+		return 0.0;
+	}
+	return ::atof(s);
+}
+
+static KYTY_SYSV_ABI int64_t libc_clock() {
+	// Microseconds since the first call; mirrors the CRT's monotonic clock().
+	using clock_t = std::chrono::steady_clock;
+	static const auto start = clock_t::now();
+	auto               d     = clock_t::now() - start;
+	return std::chrono::duration_cast<std::chrono::microseconds>(d).count();
+}
+
+static KYTY_SYSV_ABI void* libc_memchr(const void* s, int c, size_t n) {
+	if (s == nullptr || n == 0) {
+		return nullptr;
+	}
+	return const_cast<void*>(::memchr(s, c, n));
+}
+
+// MSVC CRT internals used by the toupper / tolower macros in Sony's libc.
+// Each returns a 256-entry unsigned short table mapping byte -> upper/lower.
+// The game indexes directly: table[(unsigned char)c], so a null return
+// crashes the scan at [table + c*2].
+static const unsigned short* buildToUpperTable() {
+	static unsigned short tbl[256];
+	for (int i = 0; i < 256; ++i) {
+		tbl[i] = static_cast<unsigned short>(std::toupper(i));
+	}
+	return tbl;
+}
+static const unsigned short* buildToLowerTable() {
+	static unsigned short tbl[256];
+	for (int i = 0; i < 256; ++i) {
+		tbl[i] = static_cast<unsigned short>(std::tolower(i));
+	}
+	return tbl;
+}
+static KYTY_SYSV_ABI const unsigned short* Getptoupper() {
+	static const unsigned short* p = buildToUpperTable();
+	return p;
+}
+static KYTY_SYSV_ABI const unsigned short* Getptolower() {
+	static const unsigned short* p = buildToLowerTable();
+	return p;
+}
+
 // Itanium ABI sized operator delete: _ZdlPvm (operator delete(void*, size_t)).
 // The game owns its allocator (see MallocReplace in libKernel.cpp); any ptr
 // here was handed back by that guest allocator, not host ::malloc, so freeing
@@ -1002,6 +1051,11 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("pXvbDfchu6k", LibC::strncasecmp);
 	LIB_FUNC("kiZSXIWd9vg", LibC::libc_strcpy);
 	LIB_FUNC("RQXLbdT2lc4", LibC::libc_logf);
+	LIB_FUNC("SRI6S9B+-a4", LibC::libc_atof);
+	LIB_FUNC("QZP6I9ZZxpE", LibC::libc_clock);
+	LIB_FUNC("8u8lPzUEq+U", LibC::libc_memchr);
+	LIB_FUNC("rcQCUr0EaRU", LibC::Getptoupper);
+	LIB_FUNC("1uJgoVq3bQU", LibC::Getptolower);
 }
 
 } // namespace LibC
