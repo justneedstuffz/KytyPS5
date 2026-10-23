@@ -886,6 +886,39 @@ static KYTY_SYSV_ABI int libc_setjmp(void* /*env*/) {
 	return 0;
 }
 
+static KYTY_SYSV_ABI float libc_expf(float x) {
+	return ::expf(x);
+}
+static KYTY_SYSV_ABI float libc_tanf(float x) {
+	return ::tanf(x);
+}
+static KYTY_SYSV_ABI float libc_log2f(float x) {
+	return ::log2f(x);
+}
+
+// Microsoft-style bounds-checked strncpy_s. Matches the Annex K signature
+// used by Sony's libc: writes up to `count` bytes (plus NUL) into `dest`,
+// returning 0 on success or an errno on failure. Treat zero-sized or null
+// args defensively to avoid cascading faults.
+static KYTY_SYSV_ABI int libc_strncpy_s(char* dest, size_t dest_size,
+                                        const char* src, size_t count) {
+	if (dest == nullptr || dest_size == 0) {
+		return 22; // EINVAL
+	}
+	if (src == nullptr) {
+		dest[0] = '\0';
+		return 22;
+	}
+	size_t src_len = ::strnlen(src, count);
+	if (src_len >= dest_size) {
+		dest[0] = '\0';
+		return 34; // ERANGE
+	}
+	::memcpy(dest, src, src_len);
+	dest[src_len] = '\0';
+	return 0;
+}
+
 static KYTY_SYSV_ABI const char16_t* libc_wcschr(const char16_t* s, char16_t c) {
 	if (s == nullptr) {
 		return nullptr;
@@ -1304,6 +1337,10 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("Zf7ewes1VtY", LibC::std_find_trivial_4);
 	LIB_FUNC("3sssb+7Wn9M", LibC::std_find_trivial_8);
 	LIB_FUNC("gNQ1V2vfXDE", LibC::libc_setjmp);
+	LIB_FUNC("8zsu04XNsZ4", LibC::libc_expf);
+	LIB_FUNC("ZE6RNL+eLbk", LibC::libc_tanf);
+	LIB_FUNC("hsi9drzHR2k", LibC::libc_log2f);
+	LIB_FUNC("YNzNkJzYqEg", LibC::libc_strncpy_s);
 }
 
 } // namespace LibC
