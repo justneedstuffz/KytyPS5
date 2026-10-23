@@ -773,8 +773,13 @@ static int kyty_printf_internal(bool sn, char* sn_s, size_t sn_n, const char* fo
 	out(static_cast<char>(0), &buffer, idx < maxlen ? idx : maxlen - 1U, maxlen);
 
 	if (sn) {
-		int s = snprintf(sn_s, sn_n, "%s", buffer.data());
-		EXIT_NOT_IMPLEMENTED(static_cast<size_t>(s) >= sn_n);
+		if (sn_n > 0 && sn_s != nullptr) {
+			// Standard C semantics: truncate on undersized buffer, always NUL-terminate,
+			// and return the number of characters that would have been written.
+			size_t to_copy = idx < sn_n - 1 ? idx : sn_n - 1;
+			::memcpy(sn_s, buffer.data(), to_copy);
+			sn_s[to_copy] = '\0';
+		}
 	} else {
 		LOGF_COLOR(Log::Color::BrightMagenta, "%s", buffer.data());
 	}
