@@ -19,7 +19,7 @@
 #define LIB_DEFINE(name) void name(Loader::SymbolDatabase* s)
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define LIB_NAME(l, m)                                                                             \
-	[[maybe_unused]] static thread_local bool PRINT_NAME_ENABLED = false;                          \
+	[[maybe_unused]] static thread_local bool PRINT_NAME_ENABLED = true;                           \
 	static constexpr char                     g_library[]        = l;                              \
 	static constexpr char                     g_module[]         = m;
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
