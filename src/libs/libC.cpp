@@ -745,6 +745,133 @@ static KYTY_SYSV_ABI const unsigned short* Getptolower() {
 	return p;
 }
 
+static KYTY_SYSV_ABI char* libc_strncat(char* dest, const char* src, size_t n) {
+	if (dest == nullptr || src == nullptr) {
+		return dest;
+	}
+	return ::strncat(dest, src, n);
+}
+
+// Guest allocator pass-through: route to host CRT. Guest-side free (NID
+// tIhsqj0qsFE) is wired to ::free so the pair stays consistent. The game's
+// own operator new/delete may still use its own allocator; the only safety
+// requirement here is "whatever libc_v1 malloc returned, libc_v1 free gets".
+static KYTY_SYSV_ABI void* libc_malloc(size_t n) {
+	return ::malloc(n);
+}
+static KYTY_SYSV_ABI void libc_free(void* p) {
+	::free(p);
+}
+static KYTY_SYSV_ABI void* libc_calloc(size_t n, size_t sz) {
+	return ::calloc(n, sz);
+}
+static KYTY_SYSV_ABI void* libc_realloc(void* p, size_t n) {
+	return ::realloc(p, n);
+}
+
+// PS5 wchar_t is 16-bit (UTF-16 code unit). Host wchar_t is 32-bit on Linux
+// and MSVC-compatible 16-bit on Windows; use char16_t directly to stay
+// portable regardless of host.
+static KYTY_SYSV_ABI size_t libc_wcslen(const char16_t* s) {
+	if (s == nullptr) {
+		return 0;
+	}
+	size_t n = 0;
+	while (s[n] != 0) {
+		++n;
+	}
+	return n;
+}
+
+static KYTY_SYSV_ABI int libc_wcsncmp(const char16_t* a, const char16_t* b, size_t n) {
+	if (a == nullptr || b == nullptr || n == 0) {
+		return 0;
+	}
+	for (size_t i = 0; i < n; ++i) {
+		if (a[i] != b[i]) {
+			return (a[i] < b[i]) ? -1 : 1;
+		}
+		if (a[i] == 0) {
+			return 0;
+		}
+	}
+	return 0;
+}
+
+static KYTY_SYSV_ABI int libc_wmemcmp(const char16_t* a, const char16_t* b, size_t n) {
+	if (a == nullptr || b == nullptr || n == 0) {
+		return 0;
+	}
+	for (size_t i = 0; i < n; ++i) {
+		if (a[i] != b[i]) {
+			return (a[i] < b[i]) ? -1 : 1;
+		}
+	}
+	return 0;
+}
+
+static KYTY_SYSV_ABI char16_t* libc_wmemset(char16_t* dest, char16_t c, size_t n) {
+	if (dest == nullptr) {
+		return dest;
+	}
+	for (size_t i = 0; i < n; ++i) {
+		dest[i] = c;
+	}
+	return dest;
+}
+
+// wcstol / wcstof: narrow the UTF-16 input to ASCII (digits + sign + dot
+// + E/e) and defer to the host CRT. The games we care about pass numeric
+// strings that fit entirely in ASCII, which keeps this transliteration safe.
+static std::string widenAsciiToString(const char16_t* w, const char16_t** end_out) {
+	std::string out;
+	if (w == nullptr) {
+		if (end_out != nullptr) {
+			*end_out = nullptr;
+		}
+		return out;
+	}
+	const char16_t* p = w;
+	while (*p != 0) {
+		auto v = static_cast<uint32_t>(*p);
+		if (v > 0x7f) {
+			break;
+		}
+		out.push_back(static_cast<char>(v));
+		++p;
+	}
+	if (end_out != nullptr) {
+		*end_out = p;
+	}
+	return out;
+}
+
+static KYTY_SYSV_ABI int64_t libc_wcstol(const char16_t* s, char16_t** endptr, int base) {
+	const char16_t* w_end = nullptr;
+	std::string     narrow = widenAsciiToString(s, &w_end);
+	char*           n_end  = nullptr;
+	int64_t         v      = ::strtoll(narrow.c_str(), &n_end, base);
+	if (endptr != nullptr) {
+		const char* n_begin = narrow.c_str();
+		size_t      offset  = static_cast<size_t>(n_end - n_begin);
+		*endptr             = const_cast<char16_t*>(s + offset);
+	}
+	return v;
+}
+
+static KYTY_SYSV_ABI float libc_wcstof(const char16_t* s, char16_t** endptr) {
+	const char16_t* w_end = nullptr;
+	std::string     narrow = widenAsciiToString(s, &w_end);
+	char*           n_end  = nullptr;
+	float           v      = ::strtof(narrow.c_str(), &n_end);
+	if (endptr != nullptr) {
+		const char* n_begin = narrow.c_str();
+		size_t      offset  = static_cast<size_t>(n_end - n_begin);
+		*endptr             = const_cast<char16_t*>(s + offset);
+	}
+	return v;
+}
+
 // Itanium ABI sized operator delete: _ZdlPvm (operator delete(void*, size_t)).
 // The game owns its allocator (see MallocReplace in libKernel.cpp); any ptr
 // here was handed back by that guest allocator, not host ::malloc, so freeing
@@ -1056,6 +1183,17 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("8u8lPzUEq+U", LibC::libc_memchr);
 	LIB_FUNC("rcQCUr0EaRU", LibC::Getptoupper);
 	LIB_FUNC("1uJgoVq3bQU", LibC::Getptolower);
+	LIB_FUNC("kHg45qPC6f0", LibC::libc_strncat);
+	LIB_FUNC("gQX+4GDQjpM", LibC::libc_malloc);
+	LIB_FUNC("tIhsqj0qsFE", LibC::libc_free);
+	LIB_FUNC("2X5agFjKxMc", LibC::libc_calloc);
+	LIB_FUNC("Y7aJ1uydPMo", LibC::libc_realloc);
+	LIB_FUNC("WkkeywLJcgU", LibC::libc_wcslen);
+	LIB_FUNC("E8wCoUEbfzk", LibC::libc_wcsncmp);
+	LIB_FUNC("QJ5xVfKkni0", LibC::libc_wmemcmp);
+	LIB_FUNC("Al8MZJh-4hM", LibC::libc_wmemset);
+	LIB_FUNC("d3dMyWORw8A", LibC::libc_wcstol);
+	LIB_FUNC("7SXNu+0KBYQ", LibC::libc_wcstof);
 }
 
 } // namespace LibC
