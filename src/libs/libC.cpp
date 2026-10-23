@@ -548,7 +548,11 @@ void KYTY_SYSV_ABI cxa_finalize(void* d) {
 static KYTY_SYSV_ABI int vsnprintf(char* s, size_t n, const char* format, VaList* va_list) {
 	PRINT_NAME();
 
-	return GetGuestVsnprintfFunc()(s, n, format, va_list);
+	// Preserve the caller's va_list state. Games commonly call vsnprintf
+	// twice (first with a null buffer to measure, then to format), relying
+	// on the va_list surviving the first call unchanged.
+	VaList copy = *va_list;
+	return GetGuestVsnprintfFunc()(s, n, format, &copy);
 }
 
 // Itanium C++ ABI __cxa_guard: guard object is 64 bits.
